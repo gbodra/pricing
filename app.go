@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -9,12 +10,15 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type App struct {
 	Router *mux.Router
 	Port   string
 	Redis  *redis.Client
+	Mongo  *mongo.Client
 }
 
 func getPort() string {
@@ -36,14 +40,21 @@ func (a *App) Initialize() {
 	}
 
 	a.Redis = redis.NewClient(&redis.Options{
-		Addr:     "cache:6379",
+		Addr:     os.Getenv("REDIS"),
 		Password: "",
 		DB:       0,
 	})
 
+	clientOptions := options.Client().ApplyURI(os.Getenv("MONGO"))
+	a.Mongo, err = mongo.Connect(context.TODO(), clientOptions)
+
+	if err != nil {
+		log.Println(err)
+	}
+
 	a.Router = mux.NewRouter()
 	a.initializeRoutes()
-	a.injectRedisClient()
+	a.injectClients()
 }
 
 func (a *App) Run() {
@@ -53,10 +64,11 @@ func (a *App) Run() {
 
 func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/health", controller.HealthCheck).Methods("GET")
-	a.Router.HandleFunc("/price", controller.GetPrice).Methods("GET")
-	a.Router.HandleFunc("/price", controller.SetPrice).Methods("POST")
+	a.Router.HandleFunc("/price/{id}", controller.GetPrice).Methods("GET")
+	a.Router.HandleFunc("/price", controller.InsertPrice).Methods("POST")
 }
 
-func (a *App) injectRedisClient() {
+func (a *App) injectClients() {
 	controller.RedisClient = a.Redis
+	controller.MongoClient = a.Mongo
 }

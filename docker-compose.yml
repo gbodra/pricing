@@ -13,4 +13,9 @@ services:
     image: redis:latest
     restart: always
     ports:
-      - '6379:6379'
+      - 6379:6379
+  database:
+    image: mongo:latest
+    restart: always
+    ports:
+      - 27017:27017
