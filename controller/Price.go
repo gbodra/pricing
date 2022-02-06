@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gbodra/pricing-api/model"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,13 +21,12 @@ var ctx = context.Background()
 var RedisClient *redis.Client
 var MongoClient *mongo.Client
 
-type Price struct {
-	ID    primitive.ObjectID `json:"id,omitempty" bson:"_id"`
-	Name  string             `json:"name" bson:"name"`
-	Price float32            `json:"price" bson:"price"`
-}
-
 func GetPrice(w http.ResponseWriter, r *http.Request) {
+	if !IsAuthenticated(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	vars := mux.Vars(r)
 	cache_active, _ := strconv.ParseBool(os.Getenv("CACHE"))
 
@@ -57,7 +57,7 @@ func GetPrice(w http.ResponseWriter, r *http.Request) {
 func getPriceFromMongo(id string) ([]byte, primitive.ObjectID) {
 	id_obj, _ := primitive.ObjectIDFromHex(id)
 	collection := MongoClient.Database("pricing").Collection("products")
-	var result Price
+	var result model.Price
 	err := collection.FindOne(context.TODO(), bson.D{{"_id", id_obj}}).Decode(&result)
 
 	if err != nil {
@@ -76,23 +76,4 @@ func cachePrice(id string) {
 	if err != nil {
 		log.Println(err)
 	}
-}
-
-func InsertPrice(w http.ResponseWriter, r *http.Request) {
-	data := Price{
-		ID:    primitive.NewObjectID(),
-		Name:  "TV",
-		Price: 100.,
-	}
-
-	collection := MongoClient.Database("pricing").Collection("products")
-	result, err := collection.InsertOne(context.TODO(), data)
-
-	if err != nil {
-		log.Println("Error inserting price")
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
 }

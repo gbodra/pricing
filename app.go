@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gbodra/pricing-api/controller"
+	"github.com/gbodra/pricing-api/migrations"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -19,17 +20,6 @@ type App struct {
 	Port   string
 	Redis  *redis.Client
 	Mongo  *mongo.Client
-}
-
-func getPort() string {
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		port = "8000"
-		log.Println("$PORT not set. Falling back to default " + port)
-	}
-
-	return port
 }
 
 func (a *App) Initialize() {
@@ -62,13 +52,36 @@ func (a *App) Run() {
 	log.Fatal(http.ListenAndServe(":"+port, a.Router))
 }
 
+func (a *App) RunMigrations() {
+	migrations.CreateUsers()
+	migrations.CreatePrices()
+}
+
 func (a *App) initializeRoutes() {
+	// Management routes
 	a.Router.HandleFunc("/health", controller.HealthCheck).Methods("GET")
+
+	// Auth routes
+	a.Router.HandleFunc("/signin", controller.Signin).Methods("POST")
+	a.Router.HandleFunc("/refreshtoken", controller.RefreshToken).Methods("GET")
+
+	// App routes
 	a.Router.HandleFunc("/price/{id}", controller.GetPrice).Methods("GET")
-	a.Router.HandleFunc("/price", controller.InsertPrice).Methods("POST")
+}
+
+func getPort() string {
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8000"
+		log.Println("$PORT not set. Falling back to default " + port)
+	}
+
+	return port
 }
 
 func (a *App) injectClients() {
 	controller.RedisClient = a.Redis
 	controller.MongoClient = a.Mongo
+	migrations.MongoClient = a.Mongo
 }
