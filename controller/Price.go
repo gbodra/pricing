@@ -58,7 +58,7 @@ func getPriceFromMongo(id string) ([]byte, primitive.ObjectID) {
 	id_obj, _ := primitive.ObjectIDFromHex(id)
 	collection := MongoClient.Database("pricing").Collection("products")
 	var result model.Price
-	err := collection.FindOne(context.TODO(), bson.D{{"_id", id_obj}}).Decode(&result)
+	err := collection.FindOne(context.TODO(), bson.D{primitive.E{Key: "_id", Value: id_obj}}).Decode(&result)
 
 	if err != nil {
 		log.Println(err)

@@ -1,22 +1,21 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/gbodra/pricing-api/model"
 	"github.com/golang-jwt/jwt"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Create the JWT key used to create the signature
 var jwtKey = []byte(os.Getenv("JWT_SECRET"))
-
-var users = map[string]string{
-	"user1": "password1",
-	"user2": "password2",
-}
 
 // Credentials create a struct to read the username and password from the request body
 type Credentials struct {
@@ -31,6 +30,18 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
+func getPassword(username string) string {
+	collection := MongoClient.Database("pricing").Collection("users")
+	var result model.User
+	err := collection.FindOne(context.TODO(), bson.D{primitive.E{Key: "username", Value: username}}).Decode(&result)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	return result.Password
+}
+
 // Signin create the Signin handler
 func Signin(w http.ResponseWriter, r *http.Request) {
 	var creds Credentials
@@ -42,13 +53,13 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the expected password from our in memory map
-	expectedPassword, ok := users[creds.Username]
+	// Get the expected password from our database
+	expectedPassword := getPassword(creds.Username)
 
 	// If a password exists for the given user
 	// AND, if it is the same as the password we received, the we can move ahead
 	// if NOT, then we return an "Unauthorized" status
-	if !ok || expectedPassword != creds.Password {
+	if expectedPassword != creds.Password {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
