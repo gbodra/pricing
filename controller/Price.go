@@ -31,7 +31,6 @@ func GetPrice(w http.ResponseWriter, r *http.Request) {
 	cache_active, _ := strconv.ParseBool(os.Getenv("CACHE"))
 
 	if cache_active {
-		log.Printf("Cache: Active")
 		val, err := RedisClient.Get(ctx, vars["id"]).Result()
 
 		w.Header().Set("App-Cached", "True")
@@ -48,7 +47,6 @@ func GetPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Cache: Inactive")
 	price, _ := getPriceFromMongo(vars["id"])
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(price))
@@ -72,7 +70,7 @@ func getPriceFromMongo(id string) ([]byte, primitive.ObjectID) {
 func cachePrice(id string) {
 	price, id_response := getPriceFromMongo(id)
 
-	err := RedisClient.Set(ctx, id_response.Hex(), price, time.Minute).Err()
+	err := RedisClient.Set(ctx, id_response.Hex(), price, 2*time.Minute).Err()
 	if err != nil {
 		log.Println(err)
 	}
